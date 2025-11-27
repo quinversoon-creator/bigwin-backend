@@ -7,8 +7,6 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime, timezone
 import random
-import hashlib
-import hmac
 
 # ============================================================
 #  FIREBASE usando FIREBASE_KEY_JSON (variable de entorno)
@@ -34,6 +32,11 @@ USERS_COLL = "users"
 
 app = FastAPI(title="BIG WIN API")
 
+# Ruta principal obligatoria para evitar 404 en Render
+@app.get("/")
+def home():
+    return {"status": "ok", "message": "BigWin Backend funcionando"}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -53,7 +56,9 @@ def user_ref(uid):
     return db.collection(USERS_COLL).document(str(uid))
 
 def ensure_user(uid, name="Usuario"):
-    doc = user_ref(uid).get()
+    ref = user_ref(uid)
+    doc = ref.get()
+
     if not doc.exists():
         data = {
             "name": name,
@@ -66,8 +71,9 @@ def ensure_user(uid, name="Usuario"):
             "games_total": 0,
             "joined": iso_now()
         }
-        user_ref(uid).set(data)
+        ref.set(data)
         return data
+
     return doc.to_dict() or {}
 
 # ============================================================
@@ -77,11 +83,9 @@ def ensure_user(uid, name="Usuario"):
 class UserIdBody(BaseModel):
     user_id: str
 
-
 class GameRequest(BaseModel):
     user_id: str
     bet: int
-
 
 # ============================================================
 #  ENDPOINT: PERFIL
@@ -91,12 +95,13 @@ class GameRequest(BaseModel):
 def profile(user_id: str = None):
     if not user_id:
         raise HTTPException(400, "user_id faltante")
+
     uid = str(user_id)
+
     data = ensure_user(uid)
     data["id"] = uid
     data["ref_link"] = f"https://t.me/STARSBIGWIN_BOT?start={uid}"
     return data
-
 
 # ============================================================
 #  ENDPOINT: BONUS DIARIO
@@ -110,6 +115,7 @@ def bonus(body: UserIdBody):
 
     if not snap.exists():
         ensure_user(uid)
+        snap = ref.get()  # <-- FIX IMPORTANTE
 
     data = snap.to_dict()
     last = data.get("last_bonus_ts")
@@ -134,18 +140,17 @@ def bonus(body: UserIdBody):
 
     return {"ok": True, "amount": amount, "message": f"Ganaste {amount}⭐"}
 
-
 # ============================================================
-#  JUEGOS (dados, dardos, boliche, slots)
+#  JUEGOS
 # ============================================================
 
 def game_play(uid, game_name, bet):
     ref = user_ref(uid)
     snap = ref.get()
 
-    if not snap.exists:
+    if not snap.exists():
         ensure_user(uid)
-        snap = ref.get()
+        snap = ref.get()  # <-- FIX IMPORTANTE
 
     data = snap.to_dict()
 
@@ -174,7 +179,6 @@ def game_play(uid, game_name, bet):
         "stars_after": data["stars"] + (prize - bet)
     }
 
-
 @app.post("/game/dice")
 def game_dice(req: GameRequest):
     return game_play(req.user_id, "dice", req.bet)
@@ -190,7 +194,6 @@ def game_bowling(req: GameRequest):
 @app.post("/game/slots")
 def game_slots(req: GameRequest):
     return game_play(req.user_id, "slots", req.bet)
-
 
 # ============================================================
 #  RANKING / HISTORIAL / REFERIDOS
@@ -219,7 +222,6 @@ def referrals(user_id: str):
         "referrals": d.get("referrals", []),
         "ref_link": f"https://t.me/STARSBIGWIN_BOT?start={user_id}"
     }
-
 
 # ============================================================
 #  SIMPLE WEBHOOK (Placeholder)
