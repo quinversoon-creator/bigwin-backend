@@ -143,7 +143,7 @@ def game_play(uid, game_name, bet):
     ref = user_ref(uid)
     snap = ref.get()
 
-    if not snap.exists():
+    if not snap.exists:
         ensure_user(uid)
         snap = ref.get()
 
