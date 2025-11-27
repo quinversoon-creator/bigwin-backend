@@ -32,7 +32,7 @@ USERS_COLL = "users"
 
 app = FastAPI(title="BIG WIN API")
 
-# Ruta principal obligatoria para evitar 404 en Render
+# Ruta principal
 @app.get("/")
 def home():
     return {"status": "ok", "message": "BigWin Backend funcionando"}
@@ -59,7 +59,8 @@ def ensure_user(uid, name="Usuario"):
     ref = user_ref(uid)
     doc = ref.get()
 
-    if not doc.exists():
+    # FIX: Firestore usa "exists" como propiedad, NO función
+    if not doc.exists:
         data = {
             "name": name,
             "stars": 0,
@@ -88,7 +89,7 @@ class GameRequest(BaseModel):
     bet: int
 
 # ============================================================
-#  ENDPOINT: PERFIL
+#  PERFIL
 # ============================================================
 
 @app.get("/user/profile")
@@ -97,14 +98,13 @@ def profile(user_id: str = None):
         raise HTTPException(400, "user_id faltante")
 
     uid = str(user_id)
-
     data = ensure_user(uid)
     data["id"] = uid
     data["ref_link"] = f"https://t.me/STARSBIGWIN_BOT?start={uid}"
     return data
 
 # ============================================================
-#  ENDPOINT: BONUS DIARIO
+#  BONUS
 # ============================================================
 
 @app.post("/user/bonus")
@@ -113,9 +113,9 @@ def bonus(body: UserIdBody):
     ref = user_ref(uid)
     snap = ref.get()
 
-    if not snap.exists():
+    if not snap.exists:
         ensure_user(uid)
-        snap = ref.get()  # <-- FIX IMPORTANTE
+        snap = ref.get()
 
     data = snap.to_dict()
     last = data.get("last_bonus_ts")
@@ -148,9 +148,9 @@ def game_play(uid, game_name, bet):
     ref = user_ref(uid)
     snap = ref.get()
 
-    if not snap.exists():
+    if not snap.exists:
         ensure_user(uid)
-        snap = ref.get()  # <-- FIX IMPORTANTE
+        snap = ref.get()
 
     data = snap.to_dict()
 
@@ -208,14 +208,14 @@ def ranking(limit: int = 50):
 @app.get("/user/history")
 def history(user_id: str):
     snap = user_ref(user_id).get()
-    if not snap.exists():
+    if not snap.exists:
         return {"history": []}
     return {"history": snap.to_dict().get("history", [])}
 
 @app.get("/user/referrals")
 def referrals(user_id: str):
     snap = user_ref(user_id).get()
-    if not snap.exists():
+    if not snap.exists:
         return {"referrals": []}
     d = snap.to_dict()
     return {
@@ -224,7 +224,7 @@ def referrals(user_id: str):
     }
 
 # ============================================================
-#  SIMPLE WEBHOOK (Placeholder)
+#  WEBHOOK
 # ============================================================
 
 @app.post("/webhook")
